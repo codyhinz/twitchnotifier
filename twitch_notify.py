@@ -13,7 +13,7 @@ def load_state():
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
             return json.load(f)
-    return {"was_live": False, "stream_id": None}
+    return {"was_live": False}
 
 def save_state(state):
     with open(STATE_FILE, "w") as f:
@@ -50,18 +50,16 @@ def post_to_discord(message):
     requests.post(DISCORD_WEBHOOK, json={"content": message}, timeout=10).raise_for_status()
 
 def main():
-    state  = load_state()
-    token  = get_token()
-    stream = get_stream(token)
+    state    = load_state()
+    token    = get_token()
+    stream   = get_stream(token)
+    is_live  = stream is not None
+    was_live = state.get("was_live", False)
 
-    is_live    = stream is not None
-    was_live   = state.get("was_live", False)
-    last_id    = state.get("stream_id")
-    current_id = stream["id"] if stream else None
+    print(f"Live: {is_live} | Was live: {was_live}")
 
-    print(f"Live: {is_live} | Was live: {was_live} | Stream ID: {current_id}")
-
-    if is_live and (not was_live or current_id != last_id):
+    # Only notify on offline → online transition
+    if is_live and not was_live:
         title = stream.get("title", "")
         game  = stream.get("game_name", "Unknown")
         print("Just went live — posting to Discord!")
@@ -71,13 +69,12 @@ def main():
             f"Playing: {game}\n"
             f"https://twitch.tv/{TWITCH_USERNAME}"
         )
-    elif not is_live:
-        print("Not live.")
+    elif is_live and was_live:
+        print("Still live — no notification.")
     else:
-        print("Already live — no duplicate notification.")
+        print("Not live.")
 
-    state["was_live"]  = is_live
-    state["stream_id"] = current_id
+    state["was_live"] = is_live
     save_state(state)
 
 if __name__ == "__main__":
