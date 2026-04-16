@@ -3,7 +3,7 @@ import os
 import json
 
 TWITCH_USERNAME  = "nohitjerome"
-CHANNEL_NAME     = "NoHitJerome"
+CHANNEL_NAME     = "NOHITJEROME"
 DISCORD_WEBHOOK  = os.environ["DISCORD_WEBHOOK"]
 TWITCH_CLIENT_ID = os.environ["TWITCH_CLIENT_ID"]
 TWITCH_SECRET    = os.environ["TWITCH_SECRET"]
