@@ -4,7 +4,12 @@ import json
 
 TWITCH_USERNAME  = "nohitjerome"
 CHANNEL_NAME     = "NOHITJEROME"
-DISCORD_WEBHOOK  = os.environ["DISCORD_WEBHOOK"]
+# One webhook URL per line (commas also work) — one per Discord server.
+DISCORD_WEBHOOKS = [
+    u.strip()
+    for u in os.environ["DISCORD_WEBHOOK"].replace(",", "\n").splitlines()
+    if u.strip()
+]
 TWITCH_CLIENT_ID = os.environ["TWITCH_CLIENT_ID"]
 TWITCH_SECRET    = os.environ["TWITCH_SECRET"]
 STATE_FILE       = "state.json"
@@ -47,7 +52,15 @@ def get_stream(token):
     return data[0] if data else None
 
 def post_to_discord(message):
-    requests.post(DISCORD_WEBHOOK, json={"content": message}, timeout=10).raise_for_status()
+    """Post to every server. Return True if at least one accepted it."""
+    delivered = 0
+    for i, url in enumerate(DISCORD_WEBHOOKS, 1):
+        try:
+            requests.post(url, json={"content": message}, timeout=10).raise_for_status()
+            delivered += 1
+        except requests.RequestException as exc:
+            print(f"Webhook #{i} of {len(DISCORD_WEBHOOKS)} failed: {exc}")
+    return delivered > 0
 
 def main():
     state    = load_state()
@@ -56,19 +69,23 @@ def main():
     is_live  = stream is not None
     was_live = state.get("was_live", False)
 
-    print(f"Live: {is_live} | Was live: {was_live}")
+    print(f"Live: {is_live} | Was live: {was_live} | Webhooks: {len(DISCORD_WEBHOOKS)}")
 
     # Only notify on offline → online transition
     if is_live and not was_live:
         title = stream.get("title", "")
         game  = stream.get("game_name", "Unknown")
         print("Just went live — posting to Discord!")
-        post_to_discord(
+        posted = post_to_discord(
             f"🔴 **{CHANNEL_NAME}** is live on Twitch!\n"
             f"**{title}**\n"
             f"Playing: {game}\n"
             f"https://twitch.tv/{TWITCH_USERNAME}"
         )
+        if not posted:
+            # Nobody got it — leave was_live False so the next run tries again.
+            print("No webhook accepted the post — will retry next run.")
+            return
     elif is_live and was_live:
         print("Still live — no notification.")
     else:
